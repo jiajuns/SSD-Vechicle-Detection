@@ -4,6 +4,8 @@ import numpy as np
 from keras.models import Model
 from keras.layers import Input, Lambda, Conv2D, MaxPooling2D, BatchNormalization, ELU, Reshape, Concatenate, Activation
 
+from layer_anchorboxes import AnchorBoxes
+
 def build_model(image_size,
                 n_classes,
                 min_scale=0.1,
@@ -105,3 +107,73 @@ def build_model(image_size,
     conv7 = Conv2D(32, (5, 5), name='conv7', strides=(1, 1), padding='same')(pool6)
     conv7 = BatchNormalization(axis=3, momentum=0.99, name='bn7')(conv7)
     conv7 = ELU(name='elu7')(conv7)
+
+    # output shape (batches, height, weight, n_boxes*n_classes)
+    classes4 = Conv2D(n_boxes_conv4 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes4')(conv4)
+    classes5 = Conv2D(n_boxes_conv5 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes5')(conv5)
+    classes6 = Conv2D(n_boxes_conv6 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes5')(conv6)
+    classes7 = Conv2D(n_boxes_conv7 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes7')(conv7)
+
+    # predict 4 coordinates for each boundingbox
+    boxes4 = Conv2D(n_boxes_conv4 * 4, (3, 3), strides=(1, 1), padding='valid', name='boxes4')(conv4)
+    boxes5 = Conv2D(n_boxes_conv5 * 4, (3, 3), strides=(1, 1), padding='valid', name='boxes5')(conv5)
+    boxes6 = Conv2D(n_boxes_conv6 * 4, (3, 3), strides=(1, 1), padding='valid', name='boxes6')(conv6)
+    boxes7 = Conv2D(n_boxes_conv7 * 4, (3, 3), strides=(1, 1), padding='valid', name='boxes7')(conv7)
+
+    # Anchorboxes
+    anchors4 = AnchorBoxes(img_height, img_width, this_scale=scales[0], next_scale=scales[1], aspect_ratios=aspect_ratios_conv4,
+                           two_boxes_for_ar1=two_boxes_for_ar1, limit_boxes=limit_boxes, variances=variances, coords=coords, normalize_coords=normalize_coords, name='anchors4')(boxes4)
+    anchors5 = AnchorBoxes(img_height, img_width, this_scale=scales[1], next_scale=scales[2], aspect_ratios=aspect_ratios_conv5,
+                           two_boxes_for_ar1=two_boxes_for_ar1, limit_boxes=limit_boxes, variances=variances, coords=coords, normalize_coords=normalize_coords, name='anchors5')(boxes5)
+    anchors6 = AnchorBoxes(img_height, img_width, this_scale=scales[2], next_scale=scales[3], aspect_ratios=aspect_ratios_conv6,
+                           two_boxes_for_ar1=two_boxes_for_ar1, limit_boxes=limit_boxes, variances=variances, coords=coords, normalize_coords=normalize_coords, name='anchors6')(boxes6)
+    anchors7 = AnchorBoxes(img_height, img_width, this_scale=scales[3], next_scale=scales[4], aspect_ratios=aspect_ratios_conv7,
+                           two_boxes_for_ar1=two_boxes_for_ar1, limit_boxes=limit_boxes, variances=variances, coords=coords, normalize_coords=normalize_coords, name='anchors7')(boxes7)
+
+    # reshape classes prediction
+    classes4_reshaped = Reshape((-1, n_classes), name='classes4_reshaped')(classes4)
+    classes5_reshaped = Reshape((-1, n_classes), name='classes5_reshaped')(classes5)
+    classes6_reshaped = Reshape((-1, n_classes), name='classes6_reshaped')(classes6)
+    classes7_reshaped = Reshape((-1, n_classes), name='classes7_reshaped')(classes7)
+
+    # reshape boxes prediction
+    boxes4_reshaped = Reshape((-1, 4), name='boxes4_reshaped')(boxes4)
+    boxes5_reshaped = Reshape((-1, 4), name='boxes5_reshaped')(boxes5)
+    boxes6_reshaped = Reshape((-1, 4), name='boxes6_reshaped')(boxes6)
+    boxes7_reshaped = Reshape((-1, 4), name='boxes7_reshaped')(boxes7)
+
+    # Reshape the anchor box tensors, yielding 3D tensors of shape `(batch, height * width * n_boxes, 8)`
+    anchors4_reshaped = Reshape((-1, 8), name='anchors4_reshape')(anchors4)
+    anchors5_reshaped = Reshape((-1, 8), name='anchors5_reshape')(anchors5)
+    anchors6_reshaped = Reshape((-1, 8), name='anchors6_reshape')(anchors6)
+    anchors7_reshaped = Reshape((-1, 8), name='anchors7_reshape')(anchors7)
+
+    # concatenate the predictions from the different layers and the associated anchor box tensors
+
+    classes_concat = Concatenate(axis=1, name='classes_concat')([classes4_reshaped,
+                                                               classes5_reshaped,
+                                                               classes6_reshaped,
+                                                               classes7_reshaped])
+
+    boxes_concat = Concatenate(axis=1, name='boxes_concat')([boxes4_reshaped,
+                                                             boxes5_reshaped,
+                                                             boxes6_reshaped,
+                                                             boxes7_reshaped])
+
+    anchors_concat = Concatenate(axis=1, name='anchors_concat')([anchors4_reshaped,
+                                                                 anchors5_reshaped,
+                                                                 anchors6_reshaped,
+                                                                 anchors7_reshaped])
+
+    classes_softmax = Activation('softmax', name='classes_softmax')(classes_concat)
+
+    predictions = Concatenate(axis=2, name='predictions')([classes_softmax, boxes_concat, anchors_concat])
+
+    model = Model(inputs=x, outputs=predictions)
+
+    predictor_sizes = np.array([classes4._keras_shape[1:3],
+                                classes5._keras_shape[1:3],
+                                classes6._keras_shape[1:3],
+                                classes7._keras_shape[1:3]])
+
+    return model, predictor_sizes
