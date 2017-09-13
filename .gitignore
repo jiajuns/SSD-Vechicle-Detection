@@ -1,1 +1,6 @@
 dataset/
+*.h5
+*.pyc
+data/
+.ipynb_checkpoints/training-checkpoint.ipynb
+.vscode/launch.json

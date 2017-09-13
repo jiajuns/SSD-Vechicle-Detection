@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import tensorflow as tf:
+import tensorflow as tf
 
 class SSDLoss:
 
@@ -18,23 +18,24 @@ class SSDLoss:
     def cross_entropy_loss(self, y_true, y_predict):
         y_predict = tf.maximum(y_predict, 1e-15)
         log_loss = - tf.reduce_sum(y_true * tf.log(y_predict), axis=-1)
+        return log_loss
 
-    def compute_loss(self, y_true, y_predict);
+    def compute_loss(self, y_true, y_predict):
         batch_size = tf.shape(y_predict)[0]
         n_boxes = tf.shape(y_predict)[1]
 
-        classification_loss = self.cross_entropy_loss(y_true[:,:,:-12], y_predict[:,:,-12])
-        localization_loss = self.smooth_L1_loss(y_true[:,:,-12:-8], y_predict[:,:,-12:-8])
+        classification_loss = tf.to_float(self.cross_entropy_loss(y_true[:,:,:-12], y_predict[:,:,:-12]))
+        localization_loss = tf.to_float(self.smooth_L1_loss(y_true[:,:,-12:-8], y_predict[:,:,-12:-8]))
 
         negatives = y_true[:,:,0]
-        positives = tf.reduce_max(y_true[:,:,1:-12], axis=-1)
+        positives = tf.to_float(tf.reduce_max(y_true[:,:,1:-12], axis=-1))
 
         n_positives = tf.reduce_sum(positives)
         pos_class_loss = tf.reduce_sum(classification_loss * positives , axis=-1)
 
         neg_class_loss_all = classification_loss * negatives
         n_neg_losses = tf.count_nonzero(neg_class_loss_all, dtype=tf.int32)
-        n_negative_keep = tf.minimum(tf.maximum(self.neg_pos_ratio * n_positives, self.n_neg_min), n_neg_losses)
+        n_negative_keep = tf.minimum(tf.maximum(self.neg_pos_ratio * tf.to_int32(n_positives), self.n_neg_min), n_neg_losses)
 
         def f1():
             return tf.zeros([batch_size])

@@ -1,11 +1,11 @@
 from __future__ import print_function
 
-import keras.backend as k
+import keras.backend as K
 from keras.engine.topology import InputSpec
 from keras.engine.topology import Layer
 import numpy as np
 
-from ssd_box_encode_decode import convert_coordinates
+from ssd_box_encode_decode_utils import convert_coordinates
 
 class AnchorBoxes(Layer):
     '''

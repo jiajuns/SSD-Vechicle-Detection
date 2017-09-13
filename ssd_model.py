@@ -79,39 +79,39 @@ def build_model(image_size,
     conv1 = ELU(name='elu1')(conv1)
     pool1 = MaxPooling2D(pool_size=(2, 2), name='pool1')(conv1)
 
-    conv2 = Conv2D(48, (5, 5), name='conv2', strides=(1, 1), padding='same')(pool1)
+    conv2 = Conv2D(48, (3, 3), name='conv2', strides=(1, 1), padding='same')(pool1)
     conv2 = BatchNormalization(axis=3, momentum=0.99, name='bn2')(conv2)
     conv2 = ELU(name='elu2')(conv2)
     pool2 = MaxPooling2D(pool_size=(2, 2), name='pool2')(conv2)
 
-    conv3 = Conv2D(64, (5, 5), name='conv3', strides=(1, 1), padding='same')(pool2)
-    conv3 = BatchNormalization(axis=3, momentum=0.99, name='bn1')(conv3)
+    conv3 = Conv2D(64, (3, 3), name='conv3', strides=(1, 1), padding='same')(pool2)
+    conv3 = BatchNormalization(axis=3, momentum=0.99, name='bn3')(conv3)
     conv3 = ELU(name='elu3')(conv3)
     pool3 = MaxPooling2D(pool_size=(2, 2), name='pool3')(conv3)
 
-    conv4 = Conv2D(64, (5, 5), name='conv4', strides=(1, 1), padding='same')(pool3)
+    conv4 = Conv2D(64, (3, 3), name='conv4', strides=(1, 1), padding='same')(pool3)
     conv4 = BatchNormalization(axis=3, momentum=0.99, name='bn4')(conv4)
     conv4 = ELU(name='elu4')(conv4)
     pool4 = MaxPooling2D(pool_size=(2, 2), name='pool4')(conv4)
 
-    conv5 = Conv2D(48, (5, 5), name='conv5', strides=(1, 1), padding='same')(pool4)
+    conv5 = Conv2D(48, (3, 3), name='conv5', strides=(1, 1), padding='same')(pool4)
     conv5 = BatchNormalization(axis=3, momentum=0.99, name='bn5')(conv5)
     conv5 = ELU(name='elu5')(conv5)
     pool5 = MaxPooling2D(pool_size=(2, 2), name='pool5')(conv5)
 
-    conv6 = Conv2D(48, (5, 5), name='conv6', strides=(1, 1), padding='same')(pool5)
+    conv6 = Conv2D(48, (3, 3), name='conv6', strides=(1, 1), padding='same')(pool5)
     conv6 = BatchNormalization(axis=3, momentum=0.99, name='bn6')(conv6)
     conv6 = ELU(name='elu6')(conv6)
     pool6 = MaxPooling2D(pool_size=(2, 2), name='pool6')(conv6)
 
-    conv7 = Conv2D(32, (5, 5), name='conv7', strides=(1, 1), padding='same')(pool6)
+    conv7 = Conv2D(32, (3, 3), name='conv7', strides=(1, 1), padding='same')(pool6)
     conv7 = BatchNormalization(axis=3, momentum=0.99, name='bn7')(conv7)
     conv7 = ELU(name='elu7')(conv7)
 
     # output shape (batches, height, weight, n_boxes*n_classes)
     classes4 = Conv2D(n_boxes_conv4 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes4')(conv4)
     classes5 = Conv2D(n_boxes_conv5 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes5')(conv5)
-    classes6 = Conv2D(n_boxes_conv6 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes5')(conv6)
+    classes6 = Conv2D(n_boxes_conv6 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes6')(conv6)
     classes7 = Conv2D(n_boxes_conv7 * n_classes, (3, 3), strides=(1, 1), padding='valid', name='classes7')(conv7)
 
     # predict 4 coordinates for each boundingbox
@@ -121,13 +121,13 @@ def build_model(image_size,
     boxes7 = Conv2D(n_boxes_conv7 * 4, (3, 3), strides=(1, 1), padding='valid', name='boxes7')(conv7)
 
     # Anchorboxes
-    anchors4 = AnchorBoxes(img_height, img_width, this_scale=scales[0], next_scale=scales[1], aspect_ratios=aspect_ratios_conv4,
+    anchors4 = AnchorBoxes(image_size[0], image_size[1], this_scale=scales[0], next_scale=scales[1], aspect_ratios=aspect_ratios_conv4,
                            two_boxes_for_ar1=two_boxes_for_ar1, limit_boxes=limit_boxes, variances=variances, coords=coords, normalize_coords=normalize_coords, name='anchors4')(boxes4)
-    anchors5 = AnchorBoxes(img_height, img_width, this_scale=scales[1], next_scale=scales[2], aspect_ratios=aspect_ratios_conv5,
+    anchors5 = AnchorBoxes(image_size[0], image_size[1], this_scale=scales[1], next_scale=scales[2], aspect_ratios=aspect_ratios_conv5,
                            two_boxes_for_ar1=two_boxes_for_ar1, limit_boxes=limit_boxes, variances=variances, coords=coords, normalize_coords=normalize_coords, name='anchors5')(boxes5)
-    anchors6 = AnchorBoxes(img_height, img_width, this_scale=scales[2], next_scale=scales[3], aspect_ratios=aspect_ratios_conv6,
+    anchors6 = AnchorBoxes(image_size[0], image_size[1], this_scale=scales[2], next_scale=scales[3], aspect_ratios=aspect_ratios_conv6,
                            two_boxes_for_ar1=two_boxes_for_ar1, limit_boxes=limit_boxes, variances=variances, coords=coords, normalize_coords=normalize_coords, name='anchors6')(boxes6)
-    anchors7 = AnchorBoxes(img_height, img_width, this_scale=scales[3], next_scale=scales[4], aspect_ratios=aspect_ratios_conv7,
+    anchors7 = AnchorBoxes(image_size[0], image_size[1], this_scale=scales[3], next_scale=scales[4], aspect_ratios=aspect_ratios_conv7,
                            two_boxes_for_ar1=two_boxes_for_ar1, limit_boxes=limit_boxes, variances=variances, coords=coords, normalize_coords=normalize_coords, name='anchors7')(boxes7)
 
     # reshape classes prediction

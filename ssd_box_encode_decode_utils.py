@@ -1,4 +1,26 @@
-from __future__ import print_function
+'''
+Includes:
+* Function to compute IoU similarity for axis-aligned, rectangular, 2D bounding boxes
+* Function to perform greedy non-maximum suppression
+* Function to decode raw SSD model output
+* Class to encode targets for SSD model training
+
+Copyright (C) 2017 Pierluigi Ferrari
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+
 import numpy as np
 
 def iou(boxes1, boxes2, coords='centroids'):
@@ -6,17 +28,20 @@ def iou(boxes1, boxes2, coords='centroids'):
     Compute the intersection-over-union similarity (also known as Jaccard similarity)
     of two axis-aligned 2D rectangular boxes or of multiple axis-aligned 2D rectangular
     boxes contained in two arrays with broadcast-compatible shapes.
+
     Three common use cases would be to compute the similarities for 1 vs. 1, 1 vs. `n`,
     or `n` vs. `n` boxes. The two arguments are symmetric.
+
     Arguments:
         boxes1 (array): Either a 1D Numpy array of shape `(4, )` containing the coordinates for one box in the
             format specified by `coords` or a 2D Numpy array of shape `(n, 4)` containing the coordinates for `n` boxes.
             Shape must be broadcast-compatible to `boxes2`.
-        boxes2 (aSbrray): Either a 1D Numpy array of shape `(4, )` containing the coordinates for one box in the
+        boxes2 (array): Either a 1D Numpy array of shape `(4, )` containing the coordinates for one box in the
             format specified by `coords` or a 2D Numpy array of shape `(n, 4)` containing the coordinates for `n` boxes.
             Shape must be broadcast-compatible to `boxes1`.
         coords (str, optional): The coordinate format in the input arrays. Can be either 'centroids' for the format
             `(cx, cy, w, h)` or 'minmax' for the format `(xmin, xmax, ymin, ymax)`. Defaults to 'centroids'.
+
     Returns:
         A 1D Numpy array of dtype float containing values in [0,1], the Jaccard similarity of the boxes in `boxes1` and `boxes2`.
         0 means there is no overlap between two given boxes, 1 means their coordinates are identical.
@@ -45,18 +70,22 @@ def iou(boxes1, boxes2, coords='centroids'):
 def convert_coordinates(tensor, start_index, conversion='minmax2centroids'):
     '''
     Convert coordinates for axis-aligned 2D boxes between two coordinate formats.
+
     Creates a copy of `tensor`, i.e. does not operate in place. Currently there are
     two supported coordinate formats that can be converted from and to each other:
         1) (xmin, xmax, ymin, ymax) - the 'minmax' format
         2) (cx, cy, w, h) - the 'centroids' format
+
     Note that converting from one of the supported formats to another and back is
     an identity operation up to possible rounding errors for integer tensors.
+
     Arguments:
         tensor (array): A Numpy nD array containing the four consecutive coordinates
             to be converted somewhere in the last axis.
         start_index (int): The index of the first coordinate in the last axis of `tensor`.
         conversion (str, optional): The conversion direction. Can be 'minmax2centroids'
             or 'centroids2minmax'. Defaults to 'minmax2centroids'.
+
     Returns:
         A Numpy nD array, a copy of the input tensor with the converted coordinates
         in place of the original coordinates and the unaltered elements of the original
@@ -82,9 +111,11 @@ def convert_coordinates(tensor, start_index, conversion='minmax2centroids'):
 def convert_coordinates2(tensor, start_index, conversion='minmax2centroids'):
     '''
     A pure matrix multiplication implementation of `convert_coordinates()`.
+
     Although elegant, it turns out to be marginally slower on average than
     `convert_coordinates()`. Note that the two matrices below are each other's
     multiplicative inverse.
+
     For details please refer to the documentation of `convert_coordinates()`.
     '''
     ind = start_index
@@ -109,16 +140,19 @@ def convert_coordinates2(tensor, start_index, conversion='minmax2centroids'):
 def greedy_nms(y_pred_decoded, iou_threshold=0.45, coords='minmax'):
     '''
     Perform greedy non-maximum suppression on the input boxes.
+
     Greedy NMS works by selecting the box with the highest score and
     removing all boxes around it that are too close to it measured by IoU-similarity.
     Out of the boxes that are left over, once again the one with the highest
     score is selected and so on, until no boxes with too much overlap are left.
+
     This is a basic, straight-forward NMS algorithm that is relatively efficient,
     but it has a number of downsides. One of those downsides is that the box with
     the highest score might not always be the box with the best fit to the object.
     There are more sophisticated NMS techniques like [this one](https://lirias.kuleuven.be/bitstream/123456789/506283/1/3924_postprint.pdf)
     that use a combination of nearby boxes, but in general there will probably
     always be a trade-off between speed and quality for any given NMS technique.
+
     Arguments:
         y_pred_decoded (list): A batch of decoded predictions. For a given batch size `n` this
             is a list of length `n` where each list element is a 2D Numpy array.
@@ -136,6 +170,7 @@ def greedy_nms(y_pred_decoded, iou_threshold=0.45, coords='minmax'):
             Defaults to 0.45 following the paper.
         coords (str, optional): The coordinate format of `y_pred_decoded`.
             Can be one of the formats supported by `iou()`. Defaults to 'minmax'.
+
     Returns:
         The predictions after removing non-maxima. The format is the same as the input format.
     '''
@@ -200,12 +235,14 @@ def decode_y(y_pred,
     '''
     Convert model prediction output back to a format that contains only the positive box predictions
     (i.e. the same format that `enconde_y()` takes as input).
+
     After the decoding, two stages of prediction filtering are performed for each class individually:
     First confidence thresholding, then greedy non-maximum suppression. The filtering results for all
     classes are concatenated and the `top_k` overall highest confidence results constitute the final
     predictions for a given batch item. This procedure follows the original Caffe implementation.
     For a slightly different and more efficient alternative to decode raw model output that performs
     non-maximum suppresion globally instead of per class, see `decode_y2()` below.
+
     Arguments:
         y_pred (array): The prediction output of the SSD model, expected to be a Numpy array
             of shape `(batch_size, #boxes, #classes + 4 + 4 + 4)`, where `#boxes` is the total number of
@@ -231,6 +268,7 @@ def decode_y(y_pred,
             coordinates. Requires `img_height` and `img_width` if set to `True`. Defaults to `False`.
         img_height (int, optional): The height of the input images. Only needed if `normalize_coords` is `True`.
         img_width (int, optional): The width of the input images. Only needed if `normalize_coords` is `True`.
+
     Returns:
         A python list of length `batch_size` where each list element represents the predicted boxes
         for one image and contains a Numpy array of shape `(boxes, 6)` where each row is a box prediction for
@@ -299,13 +337,16 @@ def decode_y2(y_pred,
     '''
     Convert model prediction output back to a format that contains only the positive box predictions
     (i.e. the same format that `enconde_y()` takes as input).
+
     Optionally performs confidence thresholding and greedy non-maximum suppression afte the decoding stage.
+
     Note that the decoding procedure used here is not the same as the procedure used in the original Caffe implementation.
     The procedure used here assigns every box its highest confidence as the class and then removes all boxes fro which
     the highest confidence is the background class. This results in less work for the subsequent non-maximum suppression,
     because the vast majority of the predictions will be filtered out just by the fact that their highest confidence is
     for the background class. It is much more efficient than the procedure of the original implementation, but the
     results may also differ.
+
     Arguments:
         y_pred (array): The prediction output of the SSD model, expected to be a Numpy array
             of shape `(batch_size, #boxes, #classes + 4 + 4 + 4)`, where `#boxes` is the total number of
@@ -333,6 +374,7 @@ def decode_y2(y_pred,
             coordinates. Requires `img_height` and `img_width` if set to `True`. Defaults to `False`.
         img_height (int, optional): The height of the input images. Only needed if `normalize_coords` is `True`.
         img_width (int, optional): The width of the input images. Only needed if `normalize_coords` is `True`.
+
     Returns:
         A python list of length `batch_size` where each list element represents the predicted boxes
         for one image and contains a Numpy array of shape `(boxes, 6)` where each row is a box prediction for
@@ -386,6 +428,7 @@ class SSDBoxEncoder:
     (2D bounding box coordinates and class labels) to the format required for
     training an SSD model, and to transform predictions of the SSD model back
     to the original format of the input labels.
+
     In the process of encoding ground truth labels, a template of anchor boxes
     is being built, which are subsequently matched to the ground truth boxes
     via an intersection-over-union threshold criterion.
@@ -416,24 +459,36 @@ class SSDBoxEncoder:
             predictor_sizes (list): A list of int-tuples of the format `(height, width)`
                 containing the output heights and widths of the convolutional predictor layers.
             min_scale (float, optional): The smallest scaling factor for the size of the anchor boxes as a fraction
-                of the shorter side of the input images. Defaults to 0.1.
+                of the shorter side of the input images. Defaults to 0.1. Note that you should set the scaling factors
+                such that the resulting anchor box sizes correspond to the sizes of the objects you are trying
+                to detect.
             max_scale (float, optional): The largest scaling factor for the size of the anchor boxes as a fraction
                 of the shorter side of the input images. All scaling factors between the smallest and the
                 largest will be linearly interpolated. Note that the second to last of the linearly interpolated
                 scaling factors will actually be the scaling factor for the last predictor layer, while the last
                 scaling factor is used for the second box for aspect ratio 1 in the last predictor layer
-                if `two_boxes_for_ar1` is `True`. Defaults to 0.9.
+                if `two_boxes_for_ar1` is `True`. Defaults to 0.9. Note that you should set the scaling factors
+                such that the resulting anchor box sizes correspond to the sizes of the objects you are trying
+                to detect.
             scales (list, optional): A list of floats containing scaling factors per convolutional predictor layer.
                 This list must be one element longer than the number of predictor layers. The first `k` elements are the
                 scaling factors for the `k` predictor layers, while the last element is used for the second box
                 for aspect ratio 1 in the last predictor layer if `two_boxes_for_ar1` is `True`. This additional
                 last scaling factor must be passed either way, even if it is not being used.
                 Defaults to `None`. If a list is passed, this argument overrides `min_scale` and
-                `max_scale`. All scaling factors must be greater than zero.
+                `max_scale`. All scaling factors must be greater than zero. Note that you should set the scaling factors
+                such that the resulting anchor box sizes correspond to the sizes of the objects you are trying
+                to detect.
             aspect_ratios_global (list, optional): The list of aspect ratios for which anchor boxes are to be
-                generated. This list is valid for all prediction layers. Defaults to [0.5, 1.0, 2.0].
+                generated. This list is valid for all prediction layers. Defaults to [0.5, 1.0, 2.0]. Note that you should
+                set the aspect ratios such that the resulting anchor box shapes very roughly correspond to the shapes of the
+                objects you are trying to detect. For many standard detection tasks, the default values will yield good
+                results.
             aspect_ratios_per_layer (list, optional): A list containing one aspect ratio list for each prediction layer.
-                If a list is passed, it overrides `aspect_ratios_global`. Defaults to `None`.
+                If a list is passed, it overrides `aspect_ratios_global`. Defaults to `None`. Note that you should
+                set the aspect ratios such that the resulting anchor box shapes very roughly correspond to the shapes of the
+                objects you are trying to detect. For many standard detection tasks, the default values will yield good
+                results.
             two_boxes_for_ar1 (bool, optional): Only relevant for aspect ratios lists that contain 1. Will be ignored otherwise.
                 If `True`, two anchor boxes will be generated for aspect ratio 1. The first will be generated
                 using the scaling factor for the respective layer, the second one will be generated using
@@ -525,6 +580,7 @@ class SSDBoxEncoder:
         '''
         Compute an array of the spatial positions and sizes of the anchor boxes for one particular classification
         layer of size `feature_map_size == [feature_map_height, feature_map_width]`.
+
         Arguments:
             batch_size (int): The batch size.
             feature_map_size (tuple): A list or tuple `[feature_map_height, feature_map_width]` with the spatial
@@ -544,6 +600,7 @@ class SSDBoxEncoder:
                 their distribution is, in order to determine whether the box grid covers the input images
                 appropriately and whether the box sizes are appropriate to fit the sizes of the objects
                 to be detected.
+
         Returns:
             A 4D Numpy tensor of shape `(feature_map_height, feature_map_width, n_boxes_per_cell, 4)` where the
             last dimension contains `(xmin, xmax, ymin, ymax)` for each anchor box in each cell of the feature map.
@@ -635,17 +692,21 @@ class SSDBoxEncoder:
     def generate_encode_template(self, batch_size, diagnostics=False):
         '''
         Produces an encoding template for the ground truth label tensor for a given batch.
+
         Note that all tensor creation, reshaping and concatenation operations performed in this function
         and the sub-functions it calls are identical to those performed inside the conv net model. This, of course,
         must be the case in order to preserve the spatial meaning of each box prediction, but it's useful to make
         yourself aware of this fact and why it is necessary.
+
         In other words, the boxes in `y_encoded` must have a specific order in order correspond to the right spatial
         positions and scales of the boxes predicted by the model. The sequence of operations here ensures that `y_encoded`
         has this specific form.
+
         Arguments:
             batch_size (int): The batch size.
             diagnostics (bool, optional): See the documnentation for `generate_anchor_boxes()`. The diagnostic output
                 here is similar, just for all predictor conv layers.
+
         Returns:
             A Numpy array of shape `(batch_size, #boxes, #classes + 8)`, the template into which to encode
             the ground truth labels for training. The last axis has length `#classes + 8` because the model
@@ -655,7 +716,7 @@ class SSDBoxEncoder:
 
         # 1: Get the anchor box scaling factors for each conv layer from which we're going to make predictions
         #    If `scales` is given explicitly, we'll use that instead of computing it from `min_scale` and `max_scale`
-        if not self.scales:
+        if self.scales is None:
             self.scales = np.linspace(self.min_scale, self.max_scale, len(self.predictor_sizes)+1)
 
         # 2: For each conv predictor layer (i.e. for each scale factor) get the tensors for
@@ -729,18 +790,23 @@ class SSDBoxEncoder:
     def encode_y(self, ground_truth_labels):
         '''
         Convert ground truth bounding box data into a suitable format to train an SSD model.
+
         For each image in the batch, each ground truth bounding box belonging to that image will be compared against each
         anchor box in a template with respect to their jaccard similarity. If the jaccard similarity is greater than
         or equal to the set threshold, the boxes will be matched, meaning that the ground truth box coordinates and class
         will be written to the the specific position of the matched anchor box in the template.
+
         The class for all anchor boxes for which there was no match with any ground truth box will be set to the
-        background class.
+        background class, except for those anchor boxes whose IoU similarity with any ground truth box is higher than
+        the set negative threshold (see the `neg_iou_threshold` argument in `__init__()`).
+
         Arguments:
             ground_truth_labels (list): A python list of length `batch_size` that contains one 2D Numpy array
                 for each batch image. Each such array has `k` rows for the `k` ground truth bounding boxes belonging
                 to the respective image, and the data for each ground truth bounding box has the format
                 `(class_id, xmin, xmax, ymin, ymax)`, and `class_id` must be an integer greater than 0 for all boxes
                 as class_id 0 is reserved for the background class.
+
         Returns:
             `y_encoded`, a 3D numpy array of shape `(batch_size, #boxes, #classes + 4 + 4)` that serves as the
             ground truth label tensor for training, where `#boxes` is the total number of boxes predicted by the

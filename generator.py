@@ -462,6 +462,7 @@ class BatchGenerator:
 
             for filename in self.filenames[current:current+batch_size]:
                 with Image.open('{}'.format(os.path.join(self.images_path, filename))) as img:
+                    # reshaped_img = img.resize((480, 300))
                     batch_X.append(np.array(img))
             batch_y = deepcopy(self.labels[current:current+batch_size])
 
