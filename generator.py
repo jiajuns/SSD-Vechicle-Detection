@@ -24,6 +24,7 @@ from PIL import Image
 import csv
 import os
 from bs4 import BeautifulSoup
+from moviepy.editor import VideoFileClip
 
 # Image processing functions used by the generator to perform the following image manipulations:
 # - Translation
@@ -966,3 +967,40 @@ class BatchGenerator:
             return np.array(processed_images), np.array(original_images), np.array(targets_for_csv), processed_labels
         else:
             print("Image processing completed.")
+
+
+
+class VideoGenerator(object):
+    def __init__(self,
+                 video_file_path,
+                 equalize=False,
+                 resize=False,
+                 gray=False,
+                 diagnostics=False):
+
+        self.equalize = equalize
+        self.resize = resize
+        self.gray = gray
+        self.diagnostics = diagnostics
+        
+        self.video_file_path = video_file_path
+        self.cap = cv2.VideoCapture(self.video_file_path)
+
+    def generate_frame(self):
+        while self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if frame is None: break
+            yield self.process_frame(frame)
+
+    def process_frame(self, frame):
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        if self.diagnostics:
+            original_image = np.copy(frame) # The original, unaltered images
+        if self.equalize:
+            frame = histogram_eq(frame)
+        if self.resize:
+            frame = cv2.resize(frame, dsize=self.resize)
+            img_width, img_height = self.resize # Updating these at this point is unnecessary, but it's one fewer source of error if this method gets expanded in the future
+        if self.gray:
+            frame = np.expand_dims(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), 3)
+        return np.expand_dims(frame, axis=0)
