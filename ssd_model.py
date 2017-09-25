@@ -1,9 +1,24 @@
-from __future__ import print_function
+'''
+Includes:
+* A ssd model with 7 conv layers
 
+Copyright (C) 2017 Jiajun Sun
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+
+from __future__ import print_function
 import numpy as np
 from keras.models import Model
 from keras.layers import Input, Lambda, Conv2D, MaxPooling2D, BatchNormalization, ELU, Reshape, Concatenate, Activation
-
 from layer_anchorboxes import AnchorBoxes
 
 def build_model(image_size,
@@ -18,7 +33,39 @@ def build_model(image_size,
                 variances=[1.0, 1.0, 1.0, 1.0],
                 coords='centroids',
                 normalize_coords=False):
-
+    '''
+    This is a light weight SSD model with 7 conv layer. The purpose of this model is to demonstrate the aritecture of SSD.
+    Arguments:
+        image_size (tuple, int): A tuple of integer represents the input image size
+        n_classes (int): Number of classes this model needs to differentiate from, including background always = 0
+        min_scale (float): The smallest scaling factor for the size of anchor boxes as a fraction of images.
+        max_scale (float): The largest scaling factor for the size of anchor boxes as a fraction of images.
+            While all the scale in between the min_scale and max_scale are interpolated and will be served as the scaling factor for each prediction layers.
+            The last element element is used for the second box for aspect ratio 1 in the last predictor layer if `two_boxes_for_ar1` is set to true.
+        scales (list, float): A list of float contains the scaling factor for each prediction layer`s anchor box scale. The first k elements are the scaling
+            factor for the k predition layers. While the last element is used for the second box for aspect ratio 1 in the last predictor layer 
+            if `two_boxes_for_ar1` is set to true. If a list is passed, this argument overides `min_scales` and `max_scales`.
+        aspect_ratios_global (list, optional): The list of aspect ratios for which default boxes are to be
+            generated for all layer. Defaults to [0.5, 1.0, 2.0].
+        aspect_ratios_per_layer (list, list, float): The list of a list of aspect ratios. 
+            The length of the list must match the number of prediction layer.
+        two_boxes_for_ar1 (bool, optional): Only relevant if `aspect_ratios` contains 1.
+            If `True`, two default boxes will be generated for aspect ratio 1. The first will be generated
+            using the scaling factor for the respective layer, the second one will be generated using
+            geometric mean of said scaling factor and next bigger scaling factor. Defaults to `True`.
+        limit_boxes (bool, optional): If `True`, limits box coordinates to stay within image boundaries.
+            Defaults to `True`.
+        variances (list, optional): A list of 4 floats >0 with scaling factors (actually it's not factors but divisors
+            to be precise) for the encoded predicted box coordinates. A variance value of 1.0 would apply
+            no scaling at all to the predictions, while values in (0,1) upscale the encoded predictions and values greater
+            than 1.0 downscale the encoded predictions. If you want to reproduce the configuration of the original SSD,
+            set this to `[0.1, 0.1, 0.2, 0.2]`, provided the coordinate format is 'centroids'. Defaults to `[1.0, 1.0, 1.0, 1.0]`.
+        coords (str, optional): The box coordinate format to be used. Can be either 'centroids' for the format
+            `(cx, cy, w, h)` (box center coordinates, width, and height) or 'minmax' for the format
+            `(xmin, xmax, ymin, ymax)`. Defaults to 'centroids'.
+        normalize_coords (bool, optional): Set to `True` if the model uses relative instead of absolute coordinates,
+            i.e. if the model predicts box coordinates within [0,1] instead of absolute coordinates. Defaults to `False`.
+    '''
     n_predictor_layers = 4
 
     if aspect_ratios_global is None and aspect_ratios_per_layer is None:
@@ -33,6 +80,9 @@ def build_model(image_size,
         if len(scales) != n_predictor_layers + 1:
             raise ValueError("It must be either scales is None or len(scales) == {}, \
                              but len(scales) == {}.".format(n_predictor_layers+1, len(scales)))
+    else:
+        # interpolate scales to make all layers are regularly spaced
+        scales = []
     variances = np.array(variances)
     if np.any(variances <= 0):
         raise ValueError("All variances must be > 0, but the variances given are {}".format(variances))
