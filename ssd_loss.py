@@ -3,8 +3,22 @@ from __future__ import print_function
 import tensorflow as tf
 
 class SSDLoss:
-
+    """
+    The SSD training objective is derived from the MultiBox objective but is extended to handle multiple object categories.
+    The overall objective loss function is a weighted sum of the localization loss and the confidence loss.
+    The confidence loss is the softmax loss over multiple classes confidences
+    The localization loss is a smooth L1 loss
+    """
     def __init__(self, neg_pos_ratio=3, n_neg_min=0, alpha=1.0):
+        """
+        Arguments:
+        neg_pos_ratio (int, optional): The maximum ratio of negative to positive ground truth boxes to include in the loss computation.
+            `y_true` contains anchor boxes labeled with the background class. 
+            Since the number of background boxes in `y_true` will usually exceed positive labels,
+            it is necessary to balance their influence on the loss
+        n_neg_min (int, optional): 
+        alpha (float, optional): A hyperparameter to weight the localization loss in the computation.
+        """
         self.neg_pos_ratio = tf.constant(neg_pos_ratio)
         self.n_neg_min = tf.constant(n_neg_min)
         self.alpha = tf.constant(alpha)
@@ -16,11 +30,32 @@ class SSDLoss:
         return tf.reduce_sum(l1_loss, axis=-1)
 
     def cross_entropy_loss(self, y_true, y_predict):
+        """
+        Compute the cross_entropy loss over classification softmax score
+        Arguments:
+        y_true (keras tensor): A keras tensor has shape (batch_size, num_of_boxes, num_of_classes),
+            the last axis contain the one-hot encoding for the classes.
+        y_predict (keras tensor): A keras tensor has the identical structure to y_true.
+        """
         y_predict = tf.maximum(y_predict, 1e-15)
         log_loss = - tf.reduce_sum(y_true * tf.log(y_predict), axis=-1)
         return log_loss
 
     def compute_loss(self, y_true, y_predict):
+        """
+        Compute the loss of SSD model prediction against the ground truth
+        Arguments:
+        y_true (array): A numpy array of shape '(batch_size, num_of_boxes, num_of_classes+12)',
+            Be careful to make sure that the index of each given box in `y_true` is the same as the index for 
+            corresponding box in `y_predict`.The last axis must have length of `num_of_classes + 12`,
+            The 12 last elements are 4 groud truth box coordinates (4*2) and 4 arbitrary entries.
+            The last four entries of the last axis are not used by this function and therefore their content are irrelevant in this case.
+            Import: Boxes that you want the cost function to ignore need to have a one-hot class vector of all zeros.
+        y_predict (keras tensor): The model prediction. The shape is identical to that of 'y_true'
+
+        Returns:
+        A scalar, the total multitask loss for classification and localization.
+        """
         batch_size = tf.shape(y_predict)[0]
         n_boxes = tf.shape(y_predict)[1]
 
